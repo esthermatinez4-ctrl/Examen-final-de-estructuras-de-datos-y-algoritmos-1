@@ -1,3 +1,5 @@
+# Indica las conexiones de la red de transporte,es decir:
+# Qué estaciones existen, cómo están conectadas y cuánto tarda cada conexión.
 Atocha,Sol,5
 Sol,Gran Via,3
 Gran Via,Callao,2
