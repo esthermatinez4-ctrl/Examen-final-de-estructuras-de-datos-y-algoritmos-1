@@ -1,1 +1,328 @@
-#examen final estructuras de datos y algoritmos 1
+import json
+import heapq
+from collections import deque
+
+ARCHIVO_JSON = "red_transporte.json"
+
+
+class RedTransporte:
+    def __init__(self):
+        self.grafo = {} 
+ # Lista de adyacencia con diccionarios
+
+    def _validar_nombre(self, nombre):
+        if not nombre or not nombre.strip():
+            print("Error: el nombre no puede estar vacío.")
+            return False
+        if "," in nombre:
+            print("Error: el nombre no puede contener comas.")
+            return False
+        return True
+
+# Gestión de estaciones y conexiones
+    def anadir_estacion(self, nombre):
+        if not self._validar_nombre(nombre):
+            return
+        nombre = nombre.strip()
+        if nombre in self.grafo:
+            print("Error: la estación ya existe.")
+            return
+        self.grafo[nombre] = {}
+        print(f"Estación '{nombre}' añadida.")
+
+    def anadir_conexion(self, origen, destino, tiempo):
+        origen = origen.strip()
+        destino = destino.strip()
+
+        if not self._validar_nombre(origen) or not self._validar_nombre(destino):
+            return
+
+        if origen not in self.grafo or destino not in self.grafo:
+            print("Error: ambas estaciones deben existir.")
+            return
+
+        if origen == destino:
+            print("Error: no se puede conectar una estación consigo misma.")
+            return
+
+        if tiempo <= 0:
+            print("Error: el tiempo debe ser positivo.")
+            return
+
+        if destino in self.grafo[origen]:
+            print("Error: la conexión ya existe.")
+            return
+
+        self.grafo[origen][destino] = tiempo
+        self.grafo[destino][origen] = tiempo
+        print(f"Conexión {origen} ↔ {destino} añadida ({tiempo} min).")
+
+    def mostrar_estaciones_y_conexiones(self):
+        if not self.grafo:
+            print("No hay estaciones en la red.")
+            return
+
+        print("Estaciones y conexiones:")
+        for est, vecinos in self.grafo.items():
+            if vecinos:
+                conexiones = ", ".join(f"{v}({t} min)" for v, t in vecinos.items())
+            else:
+                conexiones = "sin conexiones"
+            print(f" - {est}: {conexiones}")
+
+    def mostrar_conexiones_de(self, estacion):
+        estacion = estacion.strip()
+        if estacion not in self.grafo:
+            print("Error: la estación no existe.")
+            return
+
+        vecinos = self.grafo[estacion]
+        if not vecinos:
+            print(f"La estación '{estacion}' no tiene conexiones directas.")
+            return
+
+        print(f"Conexiones de {estacion}:")
+        for v, t in vecinos.items():
+            print(f" - {v} ({t} min)")
+
+ # Dijkstra (versión única y reutilizable)
+    def _dijkstra_camino(self, origen, destino):
+        dist = {est: float("inf") for est in self.grafo}
+        previo = {est: None for est in self.grafo}
+        dist[origen] = 0.0
+
+        cola = [(0.0, origen)]
+        visitados = set()
+
+        while cola:
+            dist_actual, est_actual = heapq.heappop(cola)
+
+            if est_actual in visitados:
+                continue
+            visitados.add(est_actual)
+
+            if est_actual == destino:
+                break
+
+            for vecino, tiempo in self.grafo[est_actual].items():
+                nueva_dist = dist_actual + tiempo
+                if nueva_dist < dist[vecino]:
+                    dist[vecino] = nueva_dist
+                    previo[vecino] = est_actual
+                    heapq.heappush(cola, (nueva_dist, vecino))
+
+        if dist[destino] == float("inf"):
+            return None, None
+
+        camino = []
+        actual = destino
+        while actual is not None:
+            camino.append(actual)
+            actual = previo[actual]
+        camino.reverse()
+
+        return camino, dist[destino]
+
+    def ruta_mas_rapida(self, origen, destino):
+        if origen not in self.grafo or destino not in self.grafo:
+            print("Error: ambas estaciones deben existir.")
+            return
+
+        camino, tiempo = self._dijkstra_camino(origen, destino)
+        if camino is None:
+            print("No existe ruta entre las estaciones.")
+            return
+
+        print("Ruta más rápida:")
+        print(" -> ".join(camino))
+        print(f"Tiempo total: {tiempo} min")
+
+ # BFS: comprobar conectividad
+    def estan_conectadas(self, origen, destino):
+        if origen not in self.grafo or destino not in self.grafo:
+            print("Error: ambas estaciones deben existir.")
+            return
+
+        visitados = set()
+        cola = deque([origen])
+
+        while cola:
+            actual = cola.popleft()
+            if actual == destino:
+                print("Sí, están conectadas.")
+                return
+            if actual in visitados:
+                continue
+            visitados.add(actual)
+            for vecino in self.grafo[actual]:
+                if vecino not in visitados:
+                    cola.append(vecino)
+
+        print("No, no están conectadas.")
+
+ # Persistencia JSON
+    def guardar_en_json(self, archivo=ARCHIVO_JSON):
+        try:
+            with open(archivo, "w", encoding="utf-8") as f:
+                json.dump(self.grafo, f, ensure_ascii=False, indent=2)
+            print("Red guardada.")
+        except Exception as e:
+            print("Error al guardar:", e)
+
+    def cargar_de_json(self, archivo=ARCHIVO_JSON):
+        try:
+            with open(archivo, "r", encoding="utf-8") as f:
+                self.grafo = json.load(f)
+            print("Red cargada.")
+        except FileNotFoundError:
+            print("No hay archivo previo. Red vacía.")
+            self.grafo = {}
+        except Exception as e:
+            print("Error al cargar:", e)
+            self.grafo = {}
+
+    # Cargar red desde archivo
+    def cargar_desde_txt(self, archivo):
+        try:
+            with open(archivo, "r", encoding="utf-8") as f:
+                for linea in f:
+                    linea = linea.strip()
+                    if not linea or linea.startswith("#"):
+                        continue
+
+                    partes = linea.split(",")
+                    if len(partes) != 3:
+                        print("Línea inválida:", linea)
+                        continue
+
+                    origen, destino, tiempo = partes
+                    origen = origen.strip()
+                    destino = destino.strip()
+
+                    try:
+                        tiempo = float(tiempo)
+                    except ValueError:
+                        print("Tiempo inválido:", linea)
+                        continue
+
+                    if tiempo <= 0:
+                        print("Tiempo no válido:", linea)
+                        continue
+
+                    if origen not in self.grafo:
+                        self.grafo[origen] = {}
+                    if destino not in self.grafo:
+                        self.grafo[destino] = {}
+
+                    if destino in self.grafo[origen]:
+                        continue
+
+                    self.grafo[origen][destino] = tiempo
+                    self.grafo[destino][origen] = tiempo
+
+            print("Red cargada desde archivo.")
+        except FileNotFoundError:
+            print("Archivo no encontrado.")
+        except Exception as e:
+            print("Error al cargar:", e)
+
+
+ # BONUS: camino mas rapido pasando (obligatoriamente) por una estación intermedia
+    def ruta_con_intermedia(self, origen, intermedia, destino):
+        for est in (origen, intermedia, destino):
+            if est not in self.grafo:
+                print(f"Error: la estación '{est}' no existe.")
+                return
+
+        ruta1, t1 = self._dijkstra_camino(origen, intermedia)
+        if ruta1 is None:
+            print("No existe ruta origen → intermedia.")
+            return
+
+        ruta2, t2 = self._dijkstra_camino(intermedia, destino)
+        if ruta2 is None:
+            print("No existe ruta intermedia → destino.")
+            return
+
+        ruta_total = ruta1 + ruta2[1:]
+        tiempo_total = t1 + t2
+
+        print("Ruta pasando por estación intermedia:")
+        print(" -> ".join(ruta_total))
+        print(f"Tiempo total: {tiempo_total} min")
+
+
+# Menú
+def mostrar_menu():
+    print("\n=== PLANIFICADOR DE RUTAS ===")
+    print("1. Cargar red desde archivo TXT")
+    print("2. Añadir estación")
+    print("3. Añadir conexión")
+    print("4. Ver estaciones y conexiones")
+    print("5. Ver conexiones de una estación")
+    print("6. Ruta más rápida (Dijkstra)")
+    print("7. ¿Están conectadas? (BFS)")
+    print("8. Ruta con estación intermedia")
+    print("9. Guardar y salir")
+
+
+def main():
+    red = RedTransporte()
+    red.cargar_de_json()
+
+    while True:
+        mostrar_menu()
+        opcion = input("Opción: ").strip()
+
+        if opcion == "1":
+            archivo = input("Archivo TXT: ")
+            red.cargar_desde_txt(archivo)
+
+        elif opcion == "2":
+            nombre = input("Nombre estación: ")
+            red.anadir_estacion(nombre)
+
+        elif opcion == "3":
+            o = input("Origen: ")
+            d = input("Destino: ")
+            try:
+                t = float(input("Tiempo: "))
+            except ValueError:
+                print("Tiempo inválido.")
+                continue
+            red.anadir_conexion(o, d, t)
+
+        elif opcion == "4":
+            red.mostrar_estaciones_y_conexiones()
+
+        elif opcion == "5":
+            est = input("Estación: ")
+            red.mostrar_conexiones_de(est)
+
+        elif opcion == "6":
+            o = input("Origen: ")
+            d = input("Destino: ")
+            red.ruta_mas_rapida(o, d)
+
+        elif opcion == "7":
+            o = input("Origen: ")
+            d = input("Destino: ")
+            red.estan_conectadas(o, d)
+
+        elif opcion == "8":
+            o = input("Origen: ")
+            i = input("Intermedia: ")
+            d = input("Destino: ")
+            red.ruta_con_intermedia(o, i, d)
+
+        elif opcion == "9":
+            red.guardar_en_json()
+            print("Saliendo.")
+            break
+
+        else:
+            print("Opción no válida.")
+
+
+if __name__ == "__main__":
+    main()
