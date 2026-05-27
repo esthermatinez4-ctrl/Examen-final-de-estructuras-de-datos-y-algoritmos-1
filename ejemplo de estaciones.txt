@@ -1,0 +1,7 @@
+Atocha,Sol,5
+Sol,Gran Via,3
+Gran Via,Callao,2
+Callao,Plaza España,4
+Atocha,Embajadores,6
+Embajadores,Delicias,3
+Delicias,Mendez Alvaro,4
